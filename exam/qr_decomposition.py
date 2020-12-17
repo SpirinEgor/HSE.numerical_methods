@@ -1,10 +1,11 @@
 import numpy as np
+from typing import Tuple
 
 
-def qr_householder(A: np.ndarray):
+def qr_householder(A: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Преобразование Хаусхолдера -- линейный оператор вида H = I - 2vv^t, где v -- вектор единичной длины. В частности поз
-    воляет занулить определенные компоненты вектора. Не сложно заметить (проверяется обычной подстановкой), что
+    Преобразование Хаусхолдера -- линейный оператор вида H = I - 2vv^t, где v -- вектор единичной длины. В частности,
+    позволяет занулить определенные компоненты вектора. Не сложно заметить (проверяется обычной подстановкой), что
     1. H^t = H
     2. HH^t = I
     Т.е. такой опреатор симметричен и ортогонален.
@@ -14,7 +15,7 @@ def qr_householder(A: np.ndarray):
     верхнетреугольную матрицу R: H @ A = R  ==>  A = H.T @ R.
 
     Если A.shape = (n, m), то итераций min(n, m). На каждой итерации i мы составляем матрицу Хаусхолдера так,
-    чтобы знанулить, элементы A[i:, i], кроме первого.
+    чтобы занулить все элементы A[i:, i], кроме первого.
 
     Подробнее можно посмотреть здесь (http://mlwiki.org/index.php/Householder_Transformation) и в 5 лекции.
     """
@@ -34,22 +35,25 @@ def qr_householder(A: np.ndarray):
 
         u = u.reshape(-1, 1)
 
+        # update matrices
         R[j:, :] = R[j:, :] - beta * u @ (u.T @ R[j:, :])
         Q[:, j:] = Q[:, j:] - beta * (Q[:, j:] @ u) @ u.T
 
     return Q, R
 
 
-def test(A):
+def test(A: np.ndarray):
     Q, R = qr_householder(A)
-    # Q, R = np.linalg.qr(A, mode='complete')
+
+    # checking if Q is orthogonal
     print(f'Q orthogonality: {np.linalg.norm(Q @ Q.T - np.eye(Q.shape[0]), ord=np.inf)}')
 
-    lower_tr_max = 0
-    for i in range(min(R.shape) - 1):
-        lower_tr_max = max(lower_tr_max, np.linalg.norm(R[i + 1:, i], ord=np.inf))
+    # checking if R's lower triangle is zero
+    lower_tr_ind = np.tril_indices(n=R.shape[0], m=R.shape[1], k=-1)
+    lower_tr_max = np.linalg.norm(R[lower_tr_ind], ord=np.inf)
     print(f'R lower part norm: {lower_tr_max}')
 
+    # checking if QR = A
     print(f'A norm: {np.linalg.norm(A - Q @ R, ord=np.inf)}\n')
 
 
