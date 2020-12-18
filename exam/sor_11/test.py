@@ -1,9 +1,10 @@
 from typing import Tuple
 import scipy.sparse
+import scipy.sparse.linalg as splinalg
 import numpy as np
 from numpy.testing import assert_allclose
 
-from exam.sor_11.sor_yarik import sor
+from exam.sor_11.sor_yarik import sor_parallelized
 
 
 def u0(x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -51,7 +52,9 @@ def build_A_u_f(N: int) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray
                 k_ = i + (j + 1) * N
                 insert(k, k_, non_diag_val)
 
-    a = scipy.sparse.csr_matrix((data, (row_ind, col_ind)), shape=(N * N, N * N), dtype=np.float64)
+    a = scipy.sparse.csr_matrix(
+        (data, (row_ind, col_ind)), shape=(N * N, N * N), dtype=np.float64
+    )
     return a, u, f
 
 
@@ -59,8 +62,11 @@ def test_sparse():
     N = 10
     a, u, f = build_A_u_f(N)
     for omega in [0.5, 1.0, 1.6, 1.8, 1.8, 1.9, 1.9]:
-        x = sor(a, f, omega, max_iter=1000, tol=1e-6)
+        x = sor_parallelized(a, f, omega, max_iter=1000, tol=1e-7)
         assert_allclose(x, u, rtol=5e-2)
+
+        scipy_x = splinalg.spsolve(a, f)
+        assert_allclose(x, scipy_x)
 
 
 def test_dense():
@@ -68,10 +74,13 @@ def test_dense():
     a, u, f = build_A_u_f(N)
     a = a.todense()
     for omega in [0.5, 1.0, 1.6, 1.8, 1.8, 1.9, 1.9]:
-        x = sor(a, f, omega, max_iter=1000, tol=1e-6)
+        x = sor_parallelized(a, f, omega, max_iter=1000, tol=1e-7)
         assert_allclose(x, u, rtol=5e-2)
 
+        numpy_x = np.linalg.solve(a, f)
+        assert_allclose(x, numpy_x)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_sparse()
     test_dense()
