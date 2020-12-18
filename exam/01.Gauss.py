@@ -14,6 +14,8 @@ def gauss(A: np.ndarray, b: np.ndarray) -> np.ndarray:
         A_[j] = A_[j] / A_[j, j]
         for i in range(j + 1, A_.shape[0]):
             A_[i] = A_[i] - A_[j] * A_[i, j]
+            if np.all(A_[i, :-1] == 0):
+                raise ValueError("Singular matrix")
 
     # extract updated b from updated A
     b_ = A_[:, -1]
