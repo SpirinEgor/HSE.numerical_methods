@@ -61,3 +61,4 @@ def test() -> NoReturn:
     assert_allclose([npq, npr], [Q, R], atol=1e-8)
 
 test()
+
