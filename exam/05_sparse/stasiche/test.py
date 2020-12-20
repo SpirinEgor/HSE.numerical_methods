@@ -17,7 +17,13 @@ def test_dot():
         vec = np.random.random(m_dense.shape[1])
         res_scipy, res_custom = m_scipy.dot(vec), m_custom.dot(vec)
         if not np.allclose(res_scipy, res_custom):
-            print(c, r)
+            print('numpy dot', c, r)
+
+        vec = csr_matrix(vec)
+        vec = CSRMatrix(vec.data, vec.indptr, vec.indices)
+        res_custom = m_custom.dot(vec)
+        if not np.allclose(res_scipy, res_custom):
+            print('CSR dot', c, r)
 
     print("it's fine")
 
@@ -29,11 +35,11 @@ def test_sum():
     m2 = CSRMatrix(np.array([2, 1, 3, 2, 2]), np.array([0, 3, 3, 5]), np.array([0, 1, 2, 1, 2]))
     res = CSRMatrix(np.array([3, 1, 3, 3, 2, 2]), np.array([0, 3, 4, 6]), np.array([0, 1, 2, 1, 1, 2]))
 
-    print(m1+m2, '\n______\n'+str(res))
+    s = m1+m2
+    print('Sum test:\n' + str(s), '\n______\n'+str(res)+'\n__________________________________\n')
 
-    # TODO fix
-    # print(m1+m2-res, '\n______\n'+str(res))
-    
+    print('Sub test:\n' + str(s-res)+'\n__________________________________')
+
     # Не должно работать, сложение матриц разного размера не определено и в scipy
     # m1 = CSRMatrix(np.array([1, 3]), np.array([0, 1, 2, 2]), np.array([0, 1]))
     # m2 = CSRMatrix(np.array([1, 2, 3, 1, 1]), np.array([0, 2, 4, 4, 5]), np.array([1, 2, 1, 3, 3]))
@@ -42,7 +48,7 @@ def test_sum():
     # print(m1+m2, '\n'+str(res))
 
     seed = np.random.randint(0, int(1e8))
-    print('____\nseed:', seed)
+    print('seed:', seed)
     np.random.seed(seed)
     shapes = np.random.randint(2, int(1e1), size=(int(1e2), 2))
     for c, r in shapes:
@@ -59,18 +65,17 @@ def test_sum():
         if (not np.allclose(res_scipy.data, res_custom.values)) \
                 and (not np.allclose(res_scipy.indptr, res_custom.ia)) \
                 and (not np.allclose(res_scipy.indices, res_custom.ja)):
-            print(c, r)
+            print('sum', c, r)
 
         res_scipy, res_custom = m_scipy1-m_scipy2, m_custom1-m_custom2
         if (not np.allclose(res_scipy.data, res_custom.values)) \
                 and (not np.allclose(res_scipy.indptr, res_custom.ia)) \
                 and (not np.allclose(res_scipy.indices, res_custom.ja)):
-            print(c, r)
+            print('substract', c, r)
     print("it's fine")
 
 
 print('dot test:')
 test_dot()
 print('##################')
-print('sum test:')
 test_sum()

@@ -1,11 +1,13 @@
 import numpy as np
 
+from typing import Tuple
+
 
 class CSRMatrix:
     def __init__(self, values: np.ndarray, ia: np.ndarray, ja: np.ndarray):
-        self.values = values
-        self.ia = ia
-        self.ja = ja
+        self.values = values    # список ненулевых значений
+        self.ia = ia            # префиксная сумма количества элементов в строках
+        self.ja = ja            # номер столбца каждого ненулевого элемента
 
         self.cols_num = self.ia.shape[0]-1
 
@@ -18,10 +20,18 @@ class CSRMatrix:
     def __sub__(self, other):
         return self.__elw_func(other, lambda x, y: x-y)
 
-    def dot(self, vec: np.ndarray):
+    def dot(self, vec: Tuple[np.ndarray, 'CSRMatrix']):
         y = np.empty(self.cols_num)
-        for i in range(self.cols_num):
-            y[i] = self.values[self.ia[i]: self.ia[i+1]] @ vec[self.ja[self.ia[i]: self.ia[i+1]]]
+
+        if isinstance(vec, np.ndarray):
+            for i in range(self.cols_num):
+                y[i] = self.values[self.ia[i]: self.ia[i+1]] @ vec[self.ja[self.ia[i]: self.ia[i+1]]]
+        elif isinstance(vec, CSRMatrix):
+            for i in range(self.cols_num):
+                y[i] = self.values[self.ia[i]: self.ia[i + 1]] @ vec.values[self.ja[self.ia[i]: self.ia[i + 1]]]
+        else:
+            raise NotImplementedError
+
         return y
 
     def __elw_func(self, other, func):
@@ -59,9 +69,11 @@ class CSRMatrix:
 
                     p2 += 1
                 elif p1 < l1 and p2 < l2:
-                    res_val.append(func(vals1[p1], vals2[p2]))
-                    res_ia[-1] += 1
-                    res_ja.append(ja1[p1])
+                    tmp = func(vals1[p1], vals2[p2])
+                    if tmp:
+                        res_val.append(func(vals1[p1], vals2[p2]))
+                        res_ia[-1] += 1
+                        res_ja.append(ja1[p1])
 
                     p1 += 1
                     p2 += 1
