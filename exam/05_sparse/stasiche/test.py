@@ -75,7 +75,7 @@ def test_sum():
     print("it's fine")
 
 
-print('dot test:')
-test_dot()
+# print('dot test:')
+# test_dot()
 print('##################')
 test_sum()

@@ -38,6 +38,7 @@ class CSRMatrix:
         if not isinstance(other, CSRMatrix):
             raise NotImplementedError
 
+        none_obj = (None, (None, None))
         # TODO replace by ndarray
         res_val = []
         res_ia = [0]
@@ -45,50 +46,34 @@ class CSRMatrix:
         for i in range(self.cols_num):
             res_ia.append(res_ia[-1])
 
-            vals1 = self.values[self.ia[i]: self.ia[i + 1]]
-            vals2 = other.values[other.ia[i]: other.ia[i + 1]]
+            it1 = enumerate(zip(self.values[self.ia[i]: self.ia[i + 1]], self.ja[self.ia[i]: self.ia[i + 1]]))
+            it2 = enumerate(zip(other.values[other.ia[i]: other.ia[i + 1]], other.ja[other.ia[i]: other.ia[i + 1]]))
 
-            l1 = vals1.shape[0]
-            l2 = vals2.shape[0]
+            p1, (val1, ja1) = next(it1, none_obj)
+            p2, (val2, ja2) = next(it2, none_obj)
+            while p1 is not None and p2 is not None:
+                if p1 is not None and ja1 < ja2:
+                    val, ja = val1, ja1
+                    p1, (val1, ja1) = next(it1, none_obj)
+                elif p2 is not None and ja2 < ja1:
+                    val, ja = val2, ja2
+                    p2, (val2, ja2) = next(it2, none_obj)
+                else:
+                    val, ja = func(val1, val2), ja1
+                    p1, (val1, ja1) = next(it1, none_obj)
+                    p2, (val2, ja2) = next(it2, none_obj)
 
-            ja1 = self.ja[self.ia[i]: self.ia[i + 1]]
-            ja2 = other.ja[other.ia[i]: other.ia[i + 1]]
-
-            p1 = p2 = 0
-            while p1 != l1 and p2 != l2:
-                if p1 < l1 and ja1[p1] < ja2[p2]:
-                    res_val.append(vals1[p1])
+                if val:
+                    res_val.append(val)
                     res_ia[-1] += 1
-                    res_ja.append(ja1[p1])
+                    res_ja.append(ja)
 
-                    p1 += 1
-                elif p2 < l2 and ja2[p2] < ja1[p1]:
-                    res_val.append(vals2[p2])
-                    res_ia[-1] += 1
-                    res_ja.append(ja2[p2])
-
-                    p2 += 1
-                elif p1 < l1 and p2 < l2:
-                    tmp = func(vals1[p1], vals2[p2])
-                    if tmp:
-                        res_val.append(func(vals1[p1], vals2[p2]))
-                        res_ia[-1] += 1
-                        res_ja.append(ja1[p1])
-
-                    p1 += 1
-                    p2 += 1
-
-            while p1 != l1:
-                res_val.append(vals1[p1])
+            it, p, val, ja = (it1, p1, val1, ja1) if p1 is not None else (it2, p2, val2, ja2)
+            while p is not None:
+                res_val.append(val)
                 res_ia[-1] += 1
-                res_ja.append(ja1[p1])
-                p1 += 1
-
-            while p2 != l2:
-                res_val.append(vals2[p2])
-                res_ia[-1] += 1
-                res_ja.append(ja2[p2])
-                p2 += 1
+                res_ja.append(ja)
+                p, (val, ja) = next(it, none_obj)
 
         res_matrix = CSRMatrix(np.array(res_val), np.array(res_ia), np.array(res_ja))
         return res_matrix
