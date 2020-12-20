@@ -3,6 +3,8 @@ import scipy
 from scipy import sparse
 from scipy import linalg
 from matplotlib import pyplot as plt
+from typing import Tuple
+
 
 # служебные функции, по которым строится матричная задача
 def u(x, y):
@@ -13,9 +15,15 @@ def f(x, y):
     return (5 * np.pi ** 2 + np.exp(x * y)) * u(x, y)
 
 
+def uf(x, y):
+    u = np.sin(np.pi * x) * np.sin(2 * np.pi * y)
+    return u, (5 * np.pi ** 2 + np.exp(x * y)) * u
+
+
 def construct(u: callable, f: callable, n: int = 10):
     """
     Конструирует матрицу A для СЛАУ A @ u = f
+    
     
     Parameters
     ==========
@@ -28,6 +36,7 @@ def construct(u: callable, f: callable, n: int = 10):
         
     n: int = 10
         показатель дробления интервала (0, 1), на котором ищется решение
+    
     
     Returns
     =======
@@ -43,54 +52,36 @@ def construct(u: callable, f: callable, n: int = 10):
         дискретизированный вектор правой части
     """
 
+    nn = (n + 1) ** 2
     h = 1 / (n + 1)
-    nn = n ** 2
-    a = 4 * (n + 1) ** 2
-    b = -1 * (n + 1) ** 2
+    a_matrix = sparse.lil_matrix((n ** 2, n ** 2))
 
-    row = []
-    col = []
-    value = []
+    points = np.arange(1, n + 1) * h
+    xs, ys = np.meshgrid(points, points)
+    xs, ys = xs.reshape(-1), ys.reshape(-1)
 
-    xs = np.zeros(shape=(nn, 1))
-    ys = np.zeros(shape=(nn, 1))
+    u_sequence, f_sequence = uf(xs, ys)
+    k = np.arange(n ** 2)
+    a_matrix[k, k] = np.exp(xs * ys) + 4 * nn
 
-    for i in range(n):
-        for j in range(n):
-            k = i + j * n
-            x = (i + 1) * h
-            y = (j + 1) * h
+    i_, j_ = np.meshgrid(np.arange(n - 1), np.arange(n))
+    i_, j_ = i_.reshape(-1), j_.reshape(-1)
+    i = np.tile(np.arange(1, n), n)
 
-            row.append(k)
-            col.append(k)
-            value.append(a + np.exp(x * y))
+    ki_ = i_ + j_ * n
+    ki = i + j_ * n
+    a_matrix[ki_, ki] = a_matrix[ki, ki_] = -nn
+    kj_ = j_ + i_ * n
+    kj = j_ + i * n
+    a_matrix[kj_, kj] = a_matrix[kj, kj_] = -nn
 
-            if i >= 1:
-                row.append(k)
-                col.append(k - 1)
-                value.append(b)
-            if i <= n - 2:
-                row.append(k)
-                col.append(k + 1)
-                value.append(b)
-
-            if j >= 1:
-                row.append(k)
-                col.append(k - n)
-                value.append(b)
-            if j <= n - 2:
-                row.append(k)
-                col.append(k + n)
-                value.append(b)
-
-            xs[k] = x
-            ys[k] = y
-    return sparse.csr_matrix((value, (row, col)), shape=(nn, nn)), u(xs, ys), f(xs, ys)
+    return sparse.csr_matrix(a_matrix), u_sequence, f_sequence
 
 
 def direct_iter(A: np.ndarray, max_iter: int = 10000, tol: float = 1e-8, normalization_step: int = 1):
     """
     Находит наибольшее собственное число матрицы A
+    
     
     Parameters
     ==========
@@ -106,13 +97,15 @@ def direct_iter(A: np.ndarray, max_iter: int = 10000, tol: float = 1e-8, normali
         
     normalization_step: int = 1
         частоста, с которой проводится периодическая нормализаций собственного вектора
-    
+
+
     Returns
     =======
     
     ev1: float
         наибольшее собственное число матрицы A
-    
+        
+        
     Reference
     =========
     
@@ -126,26 +119,24 @@ def direct_iter(A: np.ndarray, max_iter: int = 10000, tol: float = 1e-8, normali
     u2_prev = u2_prev / np.linalg.norm(u2_prev)
 
     ev1 = ev1_prev = 0
-    ev2 = ev2_prev = 0
+    ev2 = 0
     for k in range(max_iter):
         u1 = A @ u1_prev
         ev1 = (u1.T @ u1_prev / (u1_prev.T @ u1_prev)).ravel()[0]
 
-        # здесь происходит приближенный поиск второго по величине собственного числа
-        # оно пригодится для критерия остановки
+        # approximate the 2nd greatest eigenvalue needed for stop criterion
         u2 = A @ u2_prev - ev1 * (u1.T @ u2_prev).ravel()[0] * u1
         ev2 = (u2.T @ u2_prev / (u2_prev.T @ u2_prev)).ravel()[0]
 
+        # naive break condition --> will not exit immediately by next condition inside
         err = np.abs(ev1 - ev1_prev)
-        # naive break condition --> algo will not exit immediately by next condition inside
         if err < tol:
             q = ev2 / ev1
             if q / (1 - q) * err < tol:
                 break
 
         ev1_prev = ev1
-        ev2_prev = ev2
-        # normilizing vector every iteration step
+        # normalizing vector every iteration step
         # better to update with some condition or
         # at certain interation steps, e.g., every 5th step
         if k % normalization_step == 0:
@@ -206,8 +197,7 @@ def find_minmax(A: np.ndarray, max_iter: int = 10000, tol: float = 1e-8, normali
 
 def get_data(start: int = 5, finish: int = 51, step: int = 5):
     """
-    Подгатавливает данные для графиков
-    для различных размеров исходной матрицы A:
+    Подгатавливает данные для графиков для различных размеров исходной матрицы A
     shape(A) = (n ** 2, n ** 2), где n in range(start, finish, step)
     """
 
@@ -219,9 +209,9 @@ def get_data(start: int = 5, finish: int = 51, step: int = 5):
     for n in range(start, finish, step):
         """
         Time spent:
-            5m 14s for range(5, 101, 5)
-            49s for range(5, 51)
-            10s for range(5, 51, 5)
+            5m 20s for range(5, 101, 5)
+               40s for range(5, 51)
+               10s for range(5, 51, 5)
         """
 
         x.append(n)
@@ -287,7 +277,7 @@ def plot_Jacobi_vs_Seidel(x, q_jacobi, q_seidel):
     plt.title("Task №3: Jacobi vs Seidel")
     plt.legend()
     plt.show()
-
+    
 
 if __name__ == "__main__":
     x, y_min, y_max, q_jacobi, q_seidel = get_data()
